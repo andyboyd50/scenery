@@ -2,6 +2,7 @@
 #extension GL_ARB_separate_shader_objects: enable
 
 #define PI 3.14159265359
+#define INVROOT2 .7071067
 
 layout(location = 0) in vec2 textureCoord;
 layout(location = 0) out vec4 FragColor;
@@ -17,7 +18,7 @@ struct Light {
 const int MAX_NUM_LIGHTS = 128;
 
 layout(binding = 0) uniform Matrices {
-	mat4 ModelViewMatrix;
+	mat4 ViewMatrix;
 	mat4 ModelMatrix;
 	mat4 ProjectionMatrix;
 	mat4 MVP;
@@ -62,6 +63,87 @@ const vec2 poisson16[] = vec2[](    // These are the Poisson Disk Samples
 		vec2(  0.14383161,  -0.14100790 )
 );
 
+vec3 decodeSphericalNormals(vec2 encoded) {
+    float theta = encoded.y * PI;
+    float phi = (encoded.x * 2.0 * PI - PI);
+
+    float sintheta = sin(theta);
+    return vec3(sintheta * sin(phi), cos(theta), sintheta*cos(phi));
+}
+
+vec3 decodeSpheremapNormals(vec2 encoded) {
+//  Lambert Azimuthal Equal-Area projection
+//    vec2 fEncoded = encoded * 4.0 - 2.0;
+//    float f = dot(fEncoded, fEncoded);
+//    float g = sqrt(1.0-f/4.0);
+//
+//    vec3 n;
+//    n.xy = fEncoded * g;
+//    n.z = 1.0 - f/2.0;
+//
+//    return n;
+//  CryEngine3
+//    vec4 nn = vec4(encoded, 0.0, 0.0) * vec4(2.0, 2.0, 0.0, 0.0) + vec4(-1, -1, 1, -1);
+    float l = dot(encoded, encoded);
+    vec3 normal;
+    normal.z = l*2-1;
+    normal.xy = normalize(encoded.xy)*sqrt(1-normal.z*normal.z);
+//
+//    return nn.xyz * 2.0 + vec3(0, 0, -1);
+//  Stereographic
+//    float scale = 1.7777;
+//
+//    vec3 nn = vec3(encoded, 0.0) * vec3(2.0*scale, 2.0*scale, 0.0) + vec3(-scale, -scale, 1.0);
+//    float g = 2.0 / dot(nn.xyz, nn.xyz);
+//
+//    vec3 normal = vec3(0.0);
+//    normal.xy = g * nn.xy;
+//    normal.z = (g - 1.0);
+
+    return normal;
+}
+
+float square(float x) {
+    return x*x;
+}
+
+void ellipseToDisk(inout vec2 uv) {
+    float x = uv.x * sqrt(1.0 - square(uv.y) * 0.5);
+    float y = uv.y * sqrt(1.0 - square(uv.x) * 0.5);
+    uv = vec2(x, y);
+}
+
+void ellipseFromDisk(inout vec2 uv) {
+    /**Convert from the disk to the square*/
+    float uSqMinusVSq = square(uv.x) - square(uv.y);
+    // making this constant 2.0f causes a small set of vectors to be mapped off by 90 degrees
+    // because of floating point rounding errors. When set to 1.9999995f this error is no longer
+    // an issue
+    float t1 = 1.9999995 + uSqMinusVSq;
+    //float t1 = 2.0f + uSqMinusVSq;
+    float t2 = sqrt(-8.0f * square(uv.x) + t1*t1);
+    float newU = sqrt(2.0f + uSqMinusVSq - t2) * INVROOT2 * sign(uv.x);
+    float newV = 2.0f*uv.y * inversesqrt(2.0f - uSqMinusVSq + t2);
+    uv = vec2(newU, newV);
+}
+
+float squaredMagnitude(vec2 uv) {
+    return dot(uv, uv);
+}
+
+vec3 decodeEANormals(vec2 encoded) {
+    float zsign   = sign(encoded.x);
+    float u       = (abs(encoded.x) - .5) * 2.0;
+    vec2 uv = vec2(encoded.x, encoded.y);
+    /**map back from the square to the disk*/
+    ellipseToDisk(uv);
+
+    /**return the vector using the map*/
+    float r2 = squaredMagnitude(uv);
+    float temp = sqrt((1.0 - square(1.0 - r2)) / r2);
+    return vec3 ( uv.x * temp, uv.y * temp, zsign * (1.0f - r2) );
+}
+
 vec3 calculatePosition(vec2 texCoord, float depth) {
 	vec4 pos = inverse(ubo.ProjectionMatrix) * vec4(texCoord.x * 2 - 1, texCoord.y * 2 - 1, depth * 2 - 1, 1);
 	return pos.xyz;
@@ -99,9 +181,10 @@ void main()
 {
 	// Retrieve data from G-buffer
 	vec3 FragPos = texture(gPosition, textureCoord).rgb;
-	vec3 Normal = texture(gNormal, textureCoord).rgb;
+	vec3 Normal = normalize(decodeSpheremapNormals(texture(gNormal, textureCoord).rg));
+//    vec3 Normal = texture(gNormal, textureCoord).rgb;
 	vec4 Albedo = texture(gAlbedoSpec, textureCoord).rgba;
-	float Specular = texture(gAlbedoSpec, textureCoord).a;
+	float Specular = exp(texture(gAlbedoSpec, textureCoord).a)*10.5;
 	float Depth = texture(gDepth, textureCoord).r;
 
 	float fragDist = length(FragPos - ubo.CamPosition);
@@ -138,11 +221,12 @@ void main()
 		    ambientOcclusion /= sample_count;
 		}
 
-		vec3 viewDir = normalize(ubo.CamPosition - FragPos);
+        mat3 viewM = mat3(ubo.ViewMatrix*ubo.ModelMatrix);
+		vec3 viewDir = normalize(viewM*(ubo.CamPosition - FragPos));
 
 		for(int i = 0; i < numLights; ++i)
 		{
-            vec3 lightDir = normalize(lights[i].Position.rgb - FragPos);
+            vec3 lightDir = normalize(viewM*(lights[i].Position.rgb - FragPos));
             vec3 halfway = normalize(lightDir + viewDir);
             float distance = length(lights[i].Position.rgb - FragPos);
             float lightAttenuation = 1.0 / (1.0 + lights[i].Linear * distance + lights[i].Quadratic * distance * distance);
@@ -158,7 +242,7 @@ void main()
              	lighting += diffuse + specular;
 		    }
 		    // Oren-Nayar model
-		    else if(reflectanceModel == 1) {
+		    if(reflectanceModel == 1) {
 
             	float NdotL = dot(Normal, lightDir);
             	float NdotV = dot(Normal, viewDir);
@@ -189,7 +273,7 @@ void main()
             	lighting += diffuse + specular;
             }
             // Cook-Torrance
-            else if(reflectanceModel == 2) {
+            if(reflectanceModel == 2) {
                 float metallic = 1.0;
                 vec3 F0 = vec3(0.04);
                 F0 = mix(F0, Albedo.rgb, metallic);

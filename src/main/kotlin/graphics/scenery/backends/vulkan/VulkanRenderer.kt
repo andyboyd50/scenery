@@ -615,8 +615,8 @@ open class VulkanRenderer(applicationName: String,
         val matricesUbo = UBO(device, backingBuffer = buffers["UBOBuffer"])
         with(matricesUbo) {
             name = "Default"
-            members.put("ModelViewMatrix", { node.modelView })
-            members.put("ModelMatrix", { node.model })
+            members.put("ViewMatrix", { node.view })
+            members.put("ModelMatrix", { node.world })
             members.put("ProjectionMatrix", { node.projection })
             members.put("MVP", { node.mvp })
             members.put("CamPosition", { scene.findObserver().position })
@@ -1086,6 +1086,7 @@ open class VulkanRenderer(applicationName: String,
                             when (att.value.format) {
                                 RenderConfigReader.TargetFormat.RGBA_Float32 -> framebuffer.addFloatRGBABuffer(att.key, 32)
                                 RenderConfigReader.TargetFormat.RGBA_Float16 -> framebuffer.addFloatRGBABuffer(att.key, 16)
+                                RenderConfigReader.TargetFormat.RGBA_Float11 -> framebuffer.addFloatRGBABuffer(att.key, 11)
 
                                 RenderConfigReader.TargetFormat.RGB_Float32 -> framebuffer.addFloatRGBBuffer(att.key, 32)
                                 RenderConfigReader.TargetFormat.RGB_Float16 -> framebuffer.addFloatRGBBuffer(att.key, 16)
@@ -2240,7 +2241,7 @@ open class VulkanRenderer(applicationName: String,
         val defaultUbo = UBO(device)
 
         defaultUbo.name = "default"
-        defaultUbo.members.put("ModelViewMatrix", { GLMatrix.getIdentity() })
+        defaultUbo.members.put("ViewMatrix", { GLMatrix.getIdentity() })
         defaultUbo.members.put("ModelMatrix", { GLMatrix.getIdentity() })
         defaultUbo.members.put("ProjectionMatrix", { GLMatrix.getIdentity() })
         defaultUbo.members.put("MVP", { GLMatrix.getIdentity() })
@@ -2511,7 +2512,7 @@ open class VulkanRenderer(applicationName: String,
         }
     }
 
-    private fun updateDefaultUBOs(device: VkDevice) {
+    @Synchronized private fun updateDefaultUBOs(device: VkDevice) {
         val cam = scene.findObserver()
         cam.view = cam.getTransformation()
 
@@ -2532,8 +2533,7 @@ open class VulkanRenderer(applicationName: String,
             node.projection.copyFrom(cam.projection)
             node.projection.set(1, 1, -1.0f * cam.projection.get(1, 1))
 
-            node.modelView.copyFrom(cam.view)
-            node.modelView.mult(node.world)
+            node.view.copyFrom(cam.view)
 
             node.mvp.copyFrom(node.projection)
             node.mvp.mult(node.modelView)

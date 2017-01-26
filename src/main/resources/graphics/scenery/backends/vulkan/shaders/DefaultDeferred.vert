@@ -13,7 +13,7 @@ layout(location = 0) out VertexData {
 } VertexOut;
 
 layout(binding = 0) uniform Matrices {
-	mat4 ModelViewMatrix;
+	mat4 ViewMatrix;
 	mat4 ModelMatrix;
 	mat4 ProjectionMatrix;
 	mat4 MVP;
@@ -23,7 +23,7 @@ layout(binding = 0) uniform Matrices {
 
 void main()
 {
-	mat4 mv = ubo.ModelViewMatrix;
+	mat4 mv = ubo.ViewMatrix * ubo.ModelMatrix;
 	mat4 nMVP;
 
 	if(ubo.isBillboard > 0) {
@@ -39,12 +39,12 @@ void main()
 		mv[2][1] = .0f;
 		mv[2][2] = 1.0f;
 
-		nMVP = ubo.ProjectionMatrix*mv;
-	} else {
-	    nMVP = ubo.MVP;
+
 	}
 
-	VertexOut.Normal = transpose(inverse(mat3(ubo.ModelMatrix)))*vertexNormal;
+	nMVP = ubo.ProjectionMatrix*mv;
+
+	VertexOut.Normal = vec3(mv*vec4(vertexNormal, 1.0));
 	VertexOut.Position = vec3( mv * vec4(vertexPosition, 1.0));
 	VertexOut.TexCoord = vertexTexCoord;
 	VertexOut.FragPosition = vec3(ubo.ModelMatrix * vec4(vertexPosition, 1.0));

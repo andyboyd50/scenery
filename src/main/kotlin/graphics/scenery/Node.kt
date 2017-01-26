@@ -20,22 +20,22 @@ open class Node(open var name: String) : Renderable {
 
     /** Hash map used for storing metadata for the Node. [DeferredLightingRenderer] uses
      * it to e.g. store [OpenGLObjectState]. */
-    var metadata: HashMap<String, NodeMetadata> = HashMap()
+    @Volatile var metadata: HashMap<String, NodeMetadata> = HashMap()
 
     /** Material of the Node */
-    override var material: Material? = null
+    @Volatile override var material: Material? = null
     /** Initialisation flag. */
-    override var initialized: Boolean = false
+    @Volatile override var initialized: Boolean = false
     /** Whether the Node is dirty and needs updating. */
-    override var dirty: Boolean = true
+    @Volatile override var dirty: Boolean = true
     /** Flag to set whether the Node is visible or not. */
-    override var visible: Boolean = true
+    @Volatile override var visible: Boolean = true
     /** Is this Node an instance of another Node? */
-    var instanceOf: Node? = null
+    @Volatile var instanceOf: Node? = null
     /** instanced properties */
-    var instancedProperties = LinkedHashMap<String, () -> Any>()
+    @Volatile var instancedProperties = LinkedHashMap<String, () -> Any>()
     /** flag to set whether this node is an instance master */
-    var instanceMaster: Boolean = false
+    @Volatile var instanceMaster: Boolean = false
     /** The Node's lock. */
     override var lock: ReentrantLock = ReentrantLock()
 
@@ -59,34 +59,34 @@ open class Node(open var name: String) : Renderable {
     open var useClassDerivedShader = false
 
     /** World transform matrix. Will create inverse [iworld] upon modification. */
-    override var world: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var world: GLMatrix = GLMatrix.getIdentity()
     /** Inverse [world] transform matrix. */
-    override var iworld: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var iworld: GLMatrix = GLMatrix.getIdentity()
     /** Model transform matrix. Will create inverse [imodel] upon modification. */
-    override var model: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var model: GLMatrix = GLMatrix.getIdentity()
     /** Inverse [world] transform matrix. */
-    override var imodel: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var imodel: GLMatrix = GLMatrix.getIdentity()
 
     /** View matrix. Will create inverse [iview] upon modification. */
-    override var view: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var view: GLMatrix = GLMatrix.getIdentity()
     /** Inverse [view] matrix. */
-    override var iview: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var iview: GLMatrix = GLMatrix.getIdentity()
 
     /** Projection matrix. Will create inverse [iprojection] upon modification. */
-    override var projection: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var projection: GLMatrix = GLMatrix.getIdentity()
     /** Inverse [projection] transform matrix. */
-    override var iprojection: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var iprojection: GLMatrix = GLMatrix.getIdentity()
 
     /** ModelView matrix. Will create inverse [imodelview] upon modification. */
-    override var modelView: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var modelView: GLMatrix = GLMatrix.getIdentity()
     /** Inverse [modelView] transform matrix. */
-    override var imodelView: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var imodelView: GLMatrix = GLMatrix.getIdentity()
 
     /** ModelViewProjection matrix. */
-    override var mvp: GLMatrix = GLMatrix.getIdentity()
+    @Volatile override var mvp: GLMatrix = GLMatrix.getIdentity()
 
     /** World position of the Node. Setting will trigger [world] update. */
-    override var position: GLVector = GLVector(0.0f, 0.0f, 0.0f)
+    @Volatile override var position: GLVector = GLVector(0.0f, 0.0f, 0.0f)
         set(v) {
             this.needsUpdate = true
             this.needsUpdateWorld = true
@@ -94,7 +94,7 @@ open class Node(open var name: String) : Renderable {
         }
 
     /** x/y/z scale of the Node. Setting will trigger [world] update. */
-    override var scale: GLVector = GLVector(1.0f, 1.0f, 1.0f)
+    @Volatile override var scale: GLVector = GLVector(1.0f, 1.0f, 1.0f)
         set(v) {
             this.needsUpdate = true
             this.needsUpdateWorld = true
@@ -102,7 +102,7 @@ open class Node(open var name: String) : Renderable {
         }
 
     /** Rotation of the Node. Setting will trigger [world] update. */
-    override var rotation: Quaternion = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+    @Volatile override var rotation: Quaternion = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
         set(q) {
             this.needsUpdate = true
             this.needsUpdateWorld = true
@@ -110,14 +110,14 @@ open class Node(open var name: String) : Renderable {
         }
 
     /** Children of the Node. */
-    var children: CopyOnWriteArrayList<Node>
+    @Volatile var children: CopyOnWriteArrayList<Node>
     /** Other nodes that have linked transforms. */
-    var linkedNodes: CopyOnWriteArrayList<Node>
+    @Volatile var linkedNodes: CopyOnWriteArrayList<Node>
     /** Parent node of this node. */
-    var parent: Node? = null
+    @Volatile var parent: Node? = null
 
     /** Flag to store whether the node is a billboard and will always face the camera. */
-    override var isBillboard: Boolean = false
+    @Volatile override var isBillboard: Boolean = false
 
     /** Creation timestamp of the node. */
     var createdAt: Long = 0
@@ -125,9 +125,9 @@ open class Node(open var name: String) : Renderable {
     var modifiedAt: Long = 0
 
     /** Stores whether the [model] matrix needs an update. */
-    var needsUpdate = true
+    @Volatile var needsUpdate = true
     /** Stores whether the [world] matrix needs an update. */
-    var needsUpdateWorld = true
+    @Volatile var needsUpdateWorld = true
 
     init {
         this.createdAt = (Timestamp(Date().time).time).toLong()

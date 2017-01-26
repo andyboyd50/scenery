@@ -225,6 +225,7 @@ class VulkanFramebuffer(protected var device: VkDevice,
         val format: Int = when(channelDepth) {
             16 -> VK_FORMAT_R16G16B16A16_SFLOAT
             32 -> VK_FORMAT_R32G32B32A32_SFLOAT
+            11 -> VK_FORMAT_B10G11R11_UFLOAT_PACK32
             else -> { System.err.println("Unsupported channel depth $channelDepth, using 16 bit."); VK_FORMAT_R16G16B16A16_SFLOAT }
         }
 
